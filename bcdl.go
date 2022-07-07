@@ -258,7 +258,9 @@ retry:
 	}
 
 	out.Close()
-	if filepath.Ext(filePath) != ".zip" {
+	if noZip {
+		return releaseFolder
+	} else if filepath.Ext(filePath) != ".zip" {
 		color.New(color.FgCyan).Print(string(">>> "))
 		fmt.Println("Moving")
 		os.MkdirAll(releaseFolder, 0600)
