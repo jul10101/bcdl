@@ -212,7 +212,7 @@ retry:
 				if err != nil {
 					log.Fatal(err)
 				}
-			} else {
+			} else if !nozip {
 				color.New(color.FgCyan).Print(string(">>> "))
 				fmt.Print("Unzipping")
 				unzip(filePath, releaseFolder)
@@ -768,6 +768,7 @@ var (
 	writeDescription       bool
 	writeReviews           bool
 	noBar                  bool
+	noZip                  bool
 )
 
 func main() {
@@ -803,6 +804,7 @@ func main() {
 
 	// Get CLI flags
 	batch := kingpin.Flag("batch", "Download From download_links.txt").Short('b').Bool()
+	zFlag := kingpin.Flag("zipped", "Keep albums in .zip format (don't extract)").Short('z').Bool()
 	dqFlag := kingpin.Flag("quality", "Quality of Download (mp3-v0, mp3-320, flac, aac-hi, vorbis, alac, wav, aiff-lossless)").Default("flac").Short('q').String()
 	ofFlag := kingpin.Flag("output", "Output Folder").Default("downloads").Short('o').String()
 	rlArg := kingpin.Arg("url", "URL to Download").String()
@@ -818,7 +820,7 @@ func main() {
 	writeDescription = *wdFlag
 	writeReviews = *wrFlag
 	noBar = *nbFlag
-
+	noZip = *zFlag
 	if *batch == true {
 		// Batch downloading
 		if _, err := os.Stat("download_links.txt"); os.IsNotExist(err) {
