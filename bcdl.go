@@ -205,6 +205,7 @@ retry:
 		}
 		if _, err := os.Stat(filePath); !os.IsNotExist(err) {
 			if noZip {
+				color.Red("### Exists")
 				return releaseFolder
 			} else if filepath.Ext(filePath) != ".zip" {
 				color.New(color.FgCyan).Print(string(">>> "))
@@ -222,8 +223,6 @@ retry:
 
 				err = os.Remove(filePath)
 			}
-		} else {
-			color.Red("### Exists")
 		}
 		return releaseFolder
 	}
