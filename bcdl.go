@@ -174,7 +174,7 @@ func unzip(src, dest string) error {
 	return nil
 }
 
-func download(url string, releaseFolder string, ignoreExistingFolder bool, filenamePrefix string) string {
+func download(url string, releaseFolder string, ignoreExistingFolder bool, filenamePrefix string, noZip bool) string {
 	errored := false
 
 retry:
@@ -204,7 +204,9 @@ retry:
 			}
 		}
 		if _, err := os.Stat(filePath); !os.IsNotExist(err) {
-			if filepath.Ext(filePath) != ".zip" {
+			if noZip {
+				return releaseFolder
+			} else if filepath.Ext(filePath) != ".zip" {
 				color.New(color.FgCyan).Print(string(">>> "))
 				fmt.Println("Moving")
 				os.MkdirAll(releaseFolder, 0600)
@@ -212,7 +214,7 @@ retry:
 				if err != nil {
 					log.Fatal(err)
 				}
-			} else if !nozip {
+			} else {
 				color.New(color.FgCyan).Print(string(">>> "))
 				fmt.Print("Unzipping")
 				unzip(filePath, releaseFolder)
@@ -220,8 +222,10 @@ retry:
 
 				err = os.Remove(filePath)
 			}
-			return releaseFolder
+		} else {
+			color.Red("### Exists")
 		}
+		return releaseFolder
 	}
 
 	out, _ := os.Create(filePath)
@@ -372,7 +376,7 @@ func getEmailLink(releaseLink string) string {
 		}
 	}
 	fmt.Println()
-	
+
 	// Get content of the email
 	emailData, _ := soup.Get("https://getnada.com/api/v1/messages/html/" + UID)
 	emailContentSoup := soup.HTMLParse(emailData)
@@ -424,7 +428,7 @@ func tryForIndividualTracks(releaseLink string) string {
 	}
 
 	for k, v := range dlInfo {
-		download(v, filepath.Join(outputFolder, folderPath), true, fmt.Sprintf("%02d. ", k))
+		download(v, filepath.Join(outputFolder, folderPath), true, fmt.Sprintf("%02d. ", k), noZip)
 	}
 
 	return filepath.Join(outputFolder, folderPath)
@@ -453,11 +457,11 @@ func tryForFreeDownloadURL(releaseLink string) {
 
 		selectDownloadURL := getEmailLink(releaseLink)
 		downloadURL = getPopplersFromSelectDownloadPage(selectDownloadURL)
-		releaseFolder = download(downloadURL, "", false, "")
+		releaseFolder = download(downloadURL, "", false, "", noZip)
 	} else {
 		selectDownloadURL := freeDownloadPage
 		downloadURL = getRetryURL(selectDownloadURL)
-		releaseFolder = download(downloadURL, "", false, "")
+		releaseFolder = download(downloadURL, "", false, "", noZip)
 	}
 	finalAdditives(releaseFolder, releaseLink)
 }
@@ -491,7 +495,7 @@ func purchasedPageDownload(releaseLink string) {
 	fmt.Println(downloadPageLink)
 
 	popplersLink := getPopplersFromSelectDownloadPage(downloadPageLink)
-	releaseFolder := download(popplersLink, "", false, "")
+	releaseFolder := download(popplersLink, "", false, "", noZip)
 	finalAdditives(releaseFolder, releaseLink)
 	fmt.Println()
 }
@@ -621,7 +625,7 @@ func userPageLinkGen(releaseLink string) {
 				fmt.Println(redownloadLink)
 
 				popplersLink := getPopplersFromSelectDownloadPage(redownloadLink)
-				releaseFolder := download(popplersLink, "", false, "")
+				releaseFolder := download(popplersLink, "", false, "", noZip)
 				finalAdditives(releaseFolder, releaseLink)
 				fmt.Println()
 			}
