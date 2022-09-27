@@ -596,7 +596,7 @@ func checkReleaseAvailability(link string) int {
 		return 1
 	}
 	// Purchased
-	if releasePageHTML.FindStrict("a", "class", "you-own-this-link").Error == nil {
+	if releasePageHTML.FindStrict("a", "class", "you-own-this-link").Error != ErrElementNotFound {
 		return 2
 	}
 	// Check if free download
