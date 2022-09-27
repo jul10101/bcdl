@@ -596,9 +596,9 @@ func checkReleaseAvailability(link string) int {
 		return 1
 	}
 	// Purchased
-	if releasePageHTML.FindStrict("a", "class", "you-own-this-link").Error != ErrElementNotFound {
+	//if releasePageHTML.FindStrict("a", "class", "you-own-this-link").Error != ErrElementNotFound {
 		return 2
-	}
+	//}
 	// Check if free download
 	buyButton := releasePageHTML.FindStrict("h4", "class", "ft compound-button main-button")
 	if buyButton.Error == nil {
