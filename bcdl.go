@@ -595,7 +595,7 @@ func checkReleaseAvailability(link string) int {
 	if regexp.MustCompile(`^(https?:\/\/)?.+\.bandcamp\.com\/?(\w+)?$`).MatchString(link) {
 		return 1
 	}
-	 Purchased
+	// Purchased
 	if releasePageHTML.FindStrict("a", "class", "you-own-this-link").Error == nil {
 		return 2
 	}
