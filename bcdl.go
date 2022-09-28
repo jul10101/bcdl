@@ -27,9 +27,9 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-func getReviews(releaseFolder string, releaseLink string) {
+func getReviews(releaseFolder string, releaseLink string, releasePageHTML soup.Root) {
 	parsedURL, _ := url.Parse(releaseLink)
-	dataEmbed := getAttrJSON("data-embed")
+	dataEmbed := getAttrJSON("data-embed", releasePageHTML)
 
 	albumID := gjson.Get(dataEmbed, "tralbum_param.value").String()
 	releaseType := gjson.Get(dataEmbed, "tralbum_param.name").String()
@@ -88,24 +88,24 @@ func writeToFile(filename string, data string) error {
 	return file.Sync()
 }
 
-func getDescription(releaseFolder string) {
+func getDescription(releaseFolder string, releasePageHTML soup.Root) {
 	description := releasePageHTML.Find("meta", "name", "description").Attrs()["content"]
 	writeToFile(filepath.Join(releaseFolder, "info.txt"), strings.TrimSpace(html.UnescapeString(description)))
 }
 
-func finalAdditives(releaseFolder string, releaseLink string) {
+func finalAdditives(releaseFolder string, releaseLink string, releasePageHTML soup.Root) {
 	releasePageSoup, _ := soup.Get(releaseLink)
 	releasePageHTML = soup.HTMLParse(releasePageSoup)
 
 	if writeDescription {
 		color.New(color.FgCyan).Print(string(">>> "))
 		fmt.Println("Writing Description")
-		getDescription(releaseFolder)
+		getDescription(releaseFolder, releasePageHTML)
 	}
 	if writeReviews {
 		color.New(color.FgCyan).Print(string(">>> "))
 		fmt.Println("Writing Reviews")
-		getReviews(releaseFolder, releaseLink)
+		getReviews(releaseFolder, releaseLink, releasePageHTML)
 	}
 }
 
@@ -340,8 +340,8 @@ func getRetryURL(link string) string {
 	return gjson.Get(jsonString, "retry_url").String()
 }
 
-func getEmailLink(releaseLink string) string {
-	dataEmbed := getAttrJSON("data-embed")
+func getEmailLink(releaseLink string, releasePageHTML soup.Root) string {
+	dataEmbed := getAttrJSON("data-embed", releasePageHTML)
 	releaseID := gjson.Get(dataEmbed, "tralbum_param.value").String()
 	releaseType := regexp.MustCompile(`bandcamp.com\/?(track|album)\/`).FindStringSubmatch(releaseLink)[1]
 
@@ -383,22 +383,22 @@ func getEmailLink(releaseLink string) string {
 	return emailContentSoup.Find("a").Attrs()["href"]
 }
 
-func getAttrJSON(attr string) string {
+func getAttrJSON(attr string, releasePageHTML soup.Root) string {
 	r := regexp.MustCompile(attr + `=["\']({.+?})["\']`).FindStringSubmatch(html.UnescapeString(releasePageHTML.HTML()))[1]
 	return r
 }
 
-func tryForFreeDownloadURL(releaseLink string) {
+func tryForFreeDownloadURL(releaseLink string, releasePageHTML soup.Root) {
 	// Searching for direct link to free download page. If mmissing, the release may be behind an email wall
 	var downloadURL string
 	var releaseFolder string
-	tralbum := getAttrJSON("data-tralbum")
+	tralbum := getAttrJSON("data-tralbum", releasePageHTML)
 	freeDownloadPage := gjson.Get(tralbum, "freeDownloadPage").String()
 	if freeDownloadPage == "" {
 		releasePageSoup, _ := soup.Get(releaseLink)
 		releasePageHTML = soup.HTMLParse(releasePageSoup)
 
-		selectDownloadURL := getEmailLink(releaseLink)
+		selectDownloadURL := getEmailLink(releaseLink, releasePageHTML)
 		downloadURL = getPopplersFromSelectDownloadPage(selectDownloadURL)
 		releaseFolder = download(downloadURL, "", false, "")
 	} else {
@@ -406,28 +406,28 @@ func tryForFreeDownloadURL(releaseLink string) {
 		downloadURL = getRetryURL(selectDownloadURL)
 		releaseFolder = download(downloadURL, "", false, "")
 	}
-	finalAdditives(releaseFolder, releaseLink)
+	finalAdditives(releaseFolder, releaseLink, releasePageHTML)
 }
 
-func freePageDownload(releaseLink string) {
+func freePageDownload(releaseLink string, releasePageHTML soup.Root) {
 	nameSection := releasePageHTML.Find("div", "id", "name-section")
 	printReleaseName(nameSection.Find("h2", "class", "trackTitle").Text(),
 		nameSection.Find("span").Find("a").Text())
 
-	tryForFreeDownloadURL(releaseLink)
+	tryForFreeDownloadURL(releaseLink, releasePageHTML)
 	fmt.Println()
 }
 
-func purchasedPageDownload(releaseLink string) {
+func purchasedPageDownload(releaseLink string, releasePageHTML soup.Root) {
 	nameSection := releasePageHTML.Find("div", "id", "name-section")
 	printReleaseName(nameSection.Find("h2", "class", "trackTitle").Text(),
 		nameSection.Find("span").Find("a").Text())
 
-	tralbum := getAttrJSON("data-tralbum")
+	tralbum := getAttrJSON("data-tralbum", releasePageHTML)
 	albumID := gjson.Get(tralbum, "id")
 
 	if collectionSummary == "" {
-		collectionSummary = getCollectionSummary(true)
+		collectionSummary = getCollectionSummary(true, releasePageHTML)
 	}
 	redownloadMap := organizeRedownloadURLS(collectionSummary)
 
@@ -439,7 +439,7 @@ func purchasedPageDownload(releaseLink string) {
 
 	popplersLink := getPopplersFromSelectDownloadPage(downloadPageLink)
 	releaseFolder := download(popplersLink, "", false, "")
-	finalAdditives(releaseFolder, releaseLink)
+	finalAdditives(releaseFolder, releaseLink, releasePageHTML)
 	fmt.Println()
 }
 
@@ -455,7 +455,7 @@ func removeDuplicateValues(stringSlice []string) []string {
 	return list
 }
 
-func artistPageLinkGen(releaseLink string) {
+func artistPageLinkGen(releaseLink string, releasePageHTML soup.Root) {
 	// Strips trailing characters off URL
 	releaseLink = regexp.MustCompile(`.+bandcamp.com`).FindString(releaseLink)
 
@@ -490,7 +490,7 @@ func artistPageLinkGen(releaseLink string) {
 		get(pageLink)
 	}
 }
-func getCollectionSummary(self bool) string {
+func getCollectionSummary(self bool, releasePageHTML soup.Root) string {
 	// Get fan ID
 	var fanID string
 	if self {
@@ -547,10 +547,10 @@ func organizeRedownloadURLS(jsonstring string) map[string]string {
 	return redownloadMap
 }
 
-func userPageLinkGen(releaseLink string) {
+func userPageLinkGen(releaseLink string, releasePageHTML soup.Root) {
 	// Decide if the user page entered is the user's or another's
 	if config.UserName == regexp.MustCompile(`.*bandcamp.com/(.*)`).FindStringSubmatch(releaseLink)[1] {
-		collectionSummary = getCollectionSummary(true)
+		collectionSummary = getCollectionSummary(true, releasePageHTML)
 
 		for _, k := range gjson.Get(collectionSummary, "items").Array() {
 			printReleaseName(gjson.Get(k.Raw, "album_title").String(),
@@ -570,12 +570,12 @@ func userPageLinkGen(releaseLink string) {
 
 				popplersLink := getPopplersFromSelectDownloadPage(redownloadLink)
 				releaseFolder := download(popplersLink, "", false, "")
-				finalAdditives(releaseFolder, releaseLink)
+				finalAdditives(releaseFolder, releaseLink, releasePageHTML)
 				fmt.Println()
 			}
 		}
 	} else {
-		collectionSummary = getCollectionSummary(false)
+		collectionSummary = getCollectionSummary(false, releasePageHTML)
 		for _, k := range gjson.Get(collectionSummary, "items").Array() {
 			if strings.HasSuffix(gjson.Get(k.Raw, "item_url").String(), "/subscribe") {
 				continue
@@ -586,7 +586,7 @@ func userPageLinkGen(releaseLink string) {
 }
 
 // Finds out what type of release the link is
-func checkReleaseAvailability(link string) int {
+func checkReleaseAvailability(link string, releasePageHTML soup.Root) int {
 	// User page
 	if regexp.MustCompile(`^(https?:\/\/)?bandcamp.com\/.+$`).MatchString(link) {
 		return 0
@@ -612,21 +612,21 @@ func checkReleaseAvailability(link string) int {
 }
 
 // Directs the link to appropriate downloader
-func availAndDownload(releaseLink string) {
-	releaseAvailability := checkReleaseAvailability(releaseLink)
+func availAndDownload(releaseLink string, releasePageHTML soup.Root) {
+	releaseAvailability := checkReleaseAvailability(releaseLink, releasePageHTML)
 	switch releaseAvailability {
 	case 0:
 		color.New(color.FgCyan).Print(string(">>> "))
 		fmt.Print("Getting links from User Page (May take a while)\n\n")
-		userPageLinkGen(releaseLink)
+		userPageLinkGen(releaseLink, releasePageHTML)
 	case 1:
 		color.New(color.FgCyan).Print(string(">>> "))
 		fmt.Print("Getting links from Artist Page (May take a while)\n\n")
-		artistPageLinkGen(releaseLink)
+		artistPageLinkGen(releaseLink, releasePageHTML)
 	case 2:
-		purchasedPageDownload(releaseLink)
+		purchasedPageDownload(releaseLink, releasePageHTML)
 	case 3:
-		freePageDownload(releaseLink)
+		freePageDownload(releaseLink, releasePageHTML)
 	default:
 		color.Red("### Paid\n\n")
 	}
@@ -652,9 +652,9 @@ func get(releaseLink string) {
 		color.Red("### Invalid Link\n\n")
 	} else {
 		releasePageSoup, _ := soup.Get(releaseLink)
-		releasePageHTML = soup.HTMLParse(releasePageSoup)
+		releasePageHTML := soup.HTMLParse(releasePageSoup)
 
-		availAndDownload(releaseLink)
+		availAndDownload(releaseLink, releasePageHTML)
 	}
 }
 
@@ -707,7 +707,6 @@ var config = struct {
 
 // Common global variables
 var (
-	releasePageHTML   soup.Root
 	outputFolder      string
 	downloadQuality   string
 	collectionSummary string
